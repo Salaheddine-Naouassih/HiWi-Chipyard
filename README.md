@@ -76,25 +76,37 @@ work/
     │   ├── chipyard/                      
     │   │   ├── src/main/scala/config/
     │   │   │   └── BoomConfigs.scala      # Top-level configs
+    │   │   │   └── HeteroConfigs.scala    # Heterogenous configs  
     │   │   ├── tests/
-    │   │   │   └──fft_dummy.c             # Manual C code with benchmarking
+    │   │   │   └──fft_benchmark.c             # Manual C code with benchmarking
+    │   │   │   └──printf.c             # printf implementation
+    │   │   │   └──printf.h             
+    │   │   │   └──syscalls.c           # syscalls for baremetal execution
+    │   │   │   └──Makefile           # add executables in Programs 
     │   └── rocket-chip/                   
     │       └── src/main/scala/tile/
     │           └── Core.scala             # Base parameter traits
     ├── sims/
     │   ├── verilator/                
     │   └── vcs/                       
-    └── software/                         
+    └── software/    
+    ├── fpga/            
+        ├── src/main/scala/vc707/                          
+        │       └── Configs.scala        
 ```
 
 ### Important Files
 | File | Purpose |
 |------|---------|
 | `BoomConfigs.scala` | Top-level configuration definitions |
+| `HeteroConfigs.scala` | Heterogenous multi-core configurations (mixed core types) |
+| `Configs.scala` | FPGA-specific configurations (VC707, 50MHz, UART, DDR wrapper) |
 | `config-mixins.scala` | Reusable config fragments (Small/Medium/Large/Mega) |
 | `parameters.scala` | BOOM core parameter definitions |
 | `Core.scala` | Rocket-Chip base parameters & computed values |
 | `frontend.scala` | Frontend constraints (line 329, 591) |
+| `tests/Makefile` | Build targets for bare-metal C benchmarks (add executables in Programs section) |
+
 
 ---
 
@@ -148,10 +160,14 @@ class WithDSETweaks extends Config((site, here, up) => {
 #### To benchmark custom applications on the custom hardware, the following workflow is used:
 1. Integration: Place C source in chipyard/tests.
 
-2. Build Configuration: Add to chipyard/tests/CMakeList.txt the following:
+2. Build Configuration: Add to chipyard/tests/Makefile the following:
 ```bash
-add_executable(exe_dummy exe_dummy.c)
-add_dump_target(exe_dummy)
+
+PROGRAMS = pwm blkdev accum charcount nic-loopback big-blkdev pingd \
+           streaming-passthrough streaming-fir nvdla spiflashread spiflashwrite fft gcd \
+           hello mt-hello symmetric fft_dummy fft_benchmark \ 
+           <your_binary/.o>
+
 ```
 #### Compilation:
 
