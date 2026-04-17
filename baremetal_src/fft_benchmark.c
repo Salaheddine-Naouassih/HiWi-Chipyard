@@ -23,14 +23,14 @@ int main() {
     uart_init();
     
     // Checkpoint 1: Did we even boot?
-    printf("1. BOOT\n");
+    //printf("1. BOOT\n");
     
     int N = 16; 
     fftw_complex *in, *out;
     fftw_plan p;
 
     // Checkpoint 2: Did malloc survive?
-    printf("2. MALLOC\n");
+    //printf("2. MALLOC\n");
     in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
     out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * N);
 
@@ -45,14 +45,21 @@ int main() {
     }
 
     // Checkpoint 3: Does the Plan crash the Stack?
-    printf("3. PLAN\n");
+    //printf("3. PLAN\n");
     p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
 
     // Checkpoint 4: Does the Execution crash the FPU?
-    printf("4. EXECUTE\n");
+    //printf("4. EXECUTE\n");
     fftw_execute(p);
 
-    printf("5. SUCCESS!\n");
+    printf("\nFFT Results\n");
+    for(int i = 0; i < 4; i++) {
+        // We cast to int for bare-metal printing safety
+        printf("Bin[%d]: Real: %d, Imag: %d\n", i, (int)out[i][0], (int)out[i][1]);
+    }
+
+
+    //printf("5. SUCCESS!\n");
 
     // CRITICAL: DO NOT REMOVE THIS LOOP
     for (volatile int i = 0; i < 2000000; i++);
