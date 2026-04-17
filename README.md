@@ -214,38 +214,66 @@ cd /scratch/naouasal
 
 ## 6. Bare-Metal Software Deployment
 
-Standard C libraries (<stdio.h>, <stdlib.h>) rely on Linux system calls (ECALL), which will crash on a bare-metal FPGA. To execute complex benchmarks like FFT, we use a custom bare-metal environment located in chipyard/tests/.
-Memory-Mapped UART (printf)
+Standard C libraries (`<stdio.h>`, `<stdlib.h>`) rely on Linux system calls (ECALL), which will crash on a bare-metal FPGA. To execute complex benchmarks like FFT, we use a custom bare-metal environment located in `chipyard/tests/`.
+
+### Memory-Mapped UART (printf)
 
 To extract data from the physical FPGA, we utilize a lightweight formatter (mpaland/printf) mapped directly to the VC707's hardware UART register.
 
-    Base Address: The SiFive UART on our Rocket configuration is located at 0x10020000.
+- **Base Address**: The SiFive UART on our Rocket configuration is located at `0x10020000`.
+- **Hardware Initialization**: The UART transmitter is enabled by writing `1` to the `TXCTRL` offset (`0x08`).
+- **Baud Rate**: For the VC707 running at 50MHz, the divisor is written to `TXDIV` (`0x18`) to achieve 115,200 baud over USB.
 
-    Hardware Initialization: The UART transmitter is enabled by writing 1 to the TXCTRL offset (0x08).
+### Dynamic Memory (malloc)
 
-    Baud Rate: For the VC707 running at 50MHz, the divisor is written to TXDIV (0x18) to achieve 115,200 baud over USB.
+To support heavy workloads like FFTW, dynamic memory allocation is supported via Newlib. A custom `_sbrk` function (in `syscalls.c`) acts as a bump-allocator, providing `malloc` access to the continuous unused DDR3 RAM space starting at the linker script's `_end` boundary.
 
-Dynamic Memory (malloc)
+### Cross-Compiling FFTW for Bare-Metal
 
-To support heavy workloads like FFTW, dynamic memory allocation is supported via Newlib. A custom _sbrk function (in syscalls.c) acts as a bump-allocator, providing malloc access to the continuous unused DDR3 RAM space starting at the linker script's _end boundary.
-Compilation Workflow
+FFTW is highly dependent on an operating system. To compile it for a bare-metal RISC-V core, it must be configured to strip OS dependencies (threads, shared libraries) and use position-independent memory addressing (`medany`) so it can reside safely in DDR3 RAM at `0x80000000`.
 
-    Place C source files in chipyard/tests.
+```bash
+# Download and extract
+wget http://www.fftw.org/fftw-3.3.10.tar.gz
+tar -xvzf fftw-3.3.10.tar.gz && cd fftw-3.3.10
 
-    Add the executable target to chipyard/tests/CMakeLists.txt:
+# Cross-compile with OS-stripping and medany flags
+./configure --host=riscv64-unknown-elf \
+            CC=riscv64-unknown-elf-gcc \
+            CFLAGS="-O2 -mcmodel=medany" \
+            --disable-shared \
+            --enable-static \
+            --disable-threads \
+            --disable-fortran
 
-CMake
+make -j$(nproc)
+```
 
-add_executable(fft_benchmark main.c syscalls.c)
-add_dump_target(fft_benchmark)
+*(Copy the resulting `libfftw3.a` and `fftw3.h` into the `chipyard/tests/` directory.)*
 
-    Compile using the RISC-V toolchain:
+### Linking External Static Libraries (Makefile Override)
 
-Bash
+Standard Chipyard Makefiles process dependencies sequentially from left to right. Because of this, external libraries must be explicitly placed at the end of the linker command to prevent "undefined reference" errors.
 
-cmake -S ./ -B ./build/ -D CMAKE_BUILD_TYPE=Debug
-cmake --build ./build/ --target all
+To link FFTW, add a custom target override to `chipyard/tests/Makefile`:
 
-## 5. Upcoming Workloads: FireMarshal
+```makefile
+# Custom override to enforce strict Linker Order for FFTW
+fft_benchmark.riscv: fft_benchmark.o $(libgloss)
+	$(GCC) $(LDFLAGS) $< -o $@ -L. -lfftw3 -lm
+```
 
-Future implementations will utilize FireMarshal (chipyard/software/firemarshal/) to build custom Buildroot/Linux images, allowing complex OS-dependent benchmarks to run on the generated SoC architecture.
+- `-L.`: Searches the current directory for library archives.
+- `-lfftw3`: Links the static `libfftw3.a` archive.
+- `-lm`: Links the standard math library (required for hardware sine/cosine).
+
+### Simulator Workload Tweaks
+
+Running complex bare-metal code in Verilator requires two safety traps to prevent simulator crashes:
+
+- **The ESTIMATE Trap**: Always use `FFTW_ESTIMATE` when generating plans. Using `FFTW_MEASURE` will cause the 50MHz simulated CPU to spend weeks endlessly looping to benchmark the math path.
+- **The Physics Delay Loop**: Add an empty delay loop (`for (volatile int i = 0; i < 2000000; i++);`) before `return 0;`. This prevents the simulator's `$finish` command from shutting off the virtual silicon before the slow 115,200 baud UART hardware finishes transmitting text.
+
+## 7. Upcoming Workloads: FireMarshal
+
+Future implementations will utilize FireMarshal (`chipyard/software/firemarshal/`) to build custom Buildroot/Linux images, allowing complex OS-dependent benchmarks to run on the generated SoC architecture.
