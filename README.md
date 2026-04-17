@@ -4,11 +4,43 @@
 ![Chipyard](https://img.shields.io/badge/Chipyard-1.10+-orange)
 ![BareMetal](https://img.shields.io/badge/Environment-Bare%20Metal-success)
 
-### Quickstart (TL;DR)
-To generate a bitstream and test the bare-metal FFT benchmark on a Rocket core:
-1. `./rocket_fpga_dse.py generate`
-2. `./rocket_fpga_dse.py build DSERocketConfig0`
-3. `make -C chipyard/tests main.riscv`
+# Quickstart (TL;DR)
+
+**Prepare the Software Environment**
+Before running benchmarks, you must cross-compile the FFTW library for bare-metal RISC-V. A helper script is provided to automate this:
+```bash
+./setup_fftw.sh
+```
+
+#### Option A: Fast Software Simulation (Default Rocket Core)
+The fastest way to verify the benchmark is running it through the Verilator software simulator using the default Chipyard configuration.
+
+```bash
+# 1. Compile the hardware simulator
+make -C chipyard/sims/verilator CONFIG=RocketConfig
+
+# 2. Compile the bare-metal C benchmark
+make -C chipyard/tests fft_benchmark.riscv
+
+# 3. Execute the simulation
+./chipyard/sims/verilator/simulator-chipyard.harness-RocketConfig ./chipyard/tests/fft_benchmark.riscv
+```
+
+#### Option B: FPGA Bitstream Generation (Custom DSE)
+To explore custom configurations and synthesize a physical bitstream for the Xilinx VC707:
+
+```bash
+# 1. Generate the custom architecture space
+./rocket_fpga_dse.py generate
+
+# 2. Kick off Vivado bitstream compilation
+./rocket_fpga_dse.py build DSERocketConfig0
+
+# 3. Compile the bare-metal C benchmark for the FPGA
+make -C chipyard/tests fft_benchmark.riscv
+
+# 4. (Deploy) Flash the bitstream to VC707 via Vivado and connect over UART (115200 or 921600 baud)
+```
 
 ## Prerequisites
 Before running the DSE pipeline, ensure your server has the following installed:
