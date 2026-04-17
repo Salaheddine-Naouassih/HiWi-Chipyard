@@ -220,10 +220,9 @@ Standard C libraries (`<stdio.h>`, `<stdlib.h>`) rely on Linux system calls (ECA
 
 To extract data from the physical FPGA, we utilize a lightweight formatter (mpaland/printf) mapped directly to the VC707's hardware UART register.
 
-- **Base Address**: The SiFive UART on our Rocket configuration is located at `0x10020000`.
-- **Hardware Initialization**: The UART transmitter is enabled by writing `1` to the `TXCTRL` offset (`0x08`).
-- **Baud Rate**: For the VC707 running at 50MHz, the divisor is written to `TXDIV` (`0x18`) to achieve 115,200 baud over USB.
-
+* **Base Address:** The SiFive UART on our Rocket configuration is located at `0x10020000`.
+* **Hardware Initialization:** The UART transmitter is enabled by writing `1` to the `TXCTRL` offset (`0x08`).
+* **High-Speed Baud Rate:** To mitigate I/O bottlenecks during simulation and FPGA execution, the hardware is configured via `WithUARTInitBaudRate(921600)`. When connecting to the FPGA via a host serial terminal (e.g., `screen` or `minicom`), the connection must be explicitly set to **921600 baud** (not the standard 115200) to prevent corrupted character output.
 ### Dynamic Memory (malloc)
 
 To support heavy workloads like FFTW, dynamic memory allocation is supported via Newlib. A custom `_sbrk` function (in `syscalls.c`) acts as a bump-allocator, providing `malloc` access to the continuous unused DDR3 RAM space starting at the linker script's `_end` boundary.
