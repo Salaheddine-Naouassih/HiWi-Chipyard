@@ -244,6 +244,29 @@ cd /scratch/naouasal
 ./rocket_fpga_dse.py run-sim <DSERocketConfigName> ./chipyard/software/firemarshal/images/br-base-bin # Boot Linux in Verilator simulation 
 ```
 
+### Frequency Configuration
+
+A custom configuration was developed targeting a frequency of 90 MHz. Based on timing analysis and the critical path in the design, the theoretical maximum frequency achievable for this setup on the VC707 FPGA is 91.17 MHz.
+
+To modify the frequency to 90 MHz (or any other target), update the `WithVC707Tweaks` and frequency settings in `chipyard/fpga/src/main/scala/vc707/Configs.scala`. Here is an example of the configuration block:
+
+```scala
+class WithVC707Tweaks extends Config (
+  // clocking
+  new chipyard.harness.WithAllClocksFromHarnessClockInstantiator ++
+  new chipyard.clocking.WithPassthroughClockGenerator ++
+  new chipyard.config.WithMemoryBusFrequency(90.0) ++
+  new chipyard.config.WithSystemBusFrequency(90.0) ++
+  new chipyard.config.WithPeripheryBusFrequency(90.0) ++
+  new chipyard.config.WithControlBusFrequency(90.0) ++
+  new chipyard.config.WithFrontBusFrequency(90.0) ++
+
+  new chipyard.harness.WithHarnessBinderClockFreqMHz(90) ++
+  new WithFPGAFrequency(90) ++ 
+  // harness binders
+  // ... rest of the Tweaks ...
+```
+
 ## 6. Bare-Metal Software Deployment
 
 Standard C libraries (`<stdio.h>`, `<stdlib.h>`) rely on Linux system calls (ECALL), which will crash on a bare-metal FPGA. To execute complex benchmarks like FFT, we use a custom bare-metal environment located in `chipyard/tests/`.
