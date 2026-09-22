@@ -1,0 +1,15 @@
+[UART] UART0 is here (stdin/stdout).
+[INFO] Starting edge detection metrics
+METRIC algorithm=edge
+METRIC dimensions=256x256
+METRIC cycles=20293365
+METRIC instructions=10393093
+METRIC ipc_milli=512
+METRIC edge_checksum=4279655
+METRIC branch_hits=unavailable
+METRIC branch_misses=unavailable
+EDGE METRICS COMPLETED SUCCESSFULLY
+- /scratch/naouasal/chipyard/sims/verilator/generated-src/chipyard.harness.TestHarness.OwnMemoryRocketConfig/gen-collateral/TestDriver.v:158: Verilog $finish
+
+DERIVED_METRIC phase=sobel simulated_seconds=0.040586730 core_hz=500000000
+HOST_METRIC scope=full_verilator_run wall_seconds=2930.914

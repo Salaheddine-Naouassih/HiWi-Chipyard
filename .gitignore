@@ -2,5 +2,6 @@
 *.elf
 *.bit
 *.log
+!tests/metrics_results/*.log
 build/
 notes

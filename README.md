@@ -52,7 +52,7 @@ Before running the DSE pipeline, ensure your server has the following installed:
 
 ### The following can be skipped using automated scripts. Jump to section 4 and 5 for usage guide.  
 
-## 1. Initial Setup
+## Initial Setup
 ```bash
 # Navigate to chipyard directory
 cd /home/rand/work/chipyard
@@ -87,7 +87,7 @@ or
 
 ---
 
-## 2. Project Structure
+## Project Structure
 
 ```
 work/
@@ -140,52 +140,6 @@ work/
 | `tests/Makefile` | Build targets for bare-metal C benchmarks (add executables in Programs section) |
 
 
----
-
-## 3.  BOOM Configuration and testing 
-
-### Configuration Structure
-```scala
-// Append to chipyard/generators/src/main/scala/config/BoomConfigs.scala
-class DSEBoomConfig0 extends Config(
-  new boom.v3.common.WithDSETweaks ++ 
-  new boom.v3.common.WithNMediumBooms(1) ++ 
-  new chipyard.config.AbstractConfig
-)
-
-```
-
-### Creating Custom Configurations
-
-```scala
-// APpend to chipyard/generators/src/main/scala/(v3 or v4)/common/config-mixins.scala
-class WithDSETweaks extends Config((site, here, up) => {
-  case TilesLocated(InSubsystem) => up(TilesLocated(InSubsystem), site) map {
-    case attach: BoomTileAttachParams => 
-      attach.copy(
-        tileParams = attach.tileParams.copy(
-          core = attach.tileParams.core.copy(
-            fetchWidth = 4,
-            decodeWidth = 2,
-            numFetchBufferEntries = 16,
-            numRobEntries = 96,
-            numIntPhysRegisters = 80,
-            numFpPhysRegisters = 64,
-            issueParams = Seq(
-               IssueParams(issueWidth=1, numEntries=16, iqType=IQT_MEM.litValue, dispatchWidth=2),
-               IssueParams(issueWidth=2, numEntries=20, iqType=IQT_INT.litValue, dispatchWidth=2),
-               IssueParams(issueWidth=1, numEntries=16, iqType=IQT_FP.litValue , dispatchWidth=2)
-            )
-          ),
-          icache = Some(attach.tileParams.icache.get.copy(fetchBytes = 8)),
-          dcache = Some(attach.tileParams.dcache.get.copy(nMSHRs = 4))
-        )
-      )
-    case other => other
-  }
-})
-
-```
 
 ---
 ### Custom Software Deployment
@@ -214,60 +168,8 @@ PROGRAMS = pwm blkdev accum charcount nic-loopback big-blkdev pingd \
 +dramsim_ini_dir=../../generators/testchipip/src/main/resources/dramsim2_ini \
 +max-cycles=10000000 +permissive-off ../../tests/build/<binaryName>.riscv
 ```
-## 4.  Automated Design Space Exploration (DSE)
 
-The boom_dse.py script automates the generation and evaluation of various configurations.
-
-For benchmarking purposes, use fft_dummy.c and corresponding  fft_dummy.riscv as a binary. 
-
-heavy_math_workload() is a placeholder function and can be swapped with fft later on.
-
-```bash
-source clean_activation.sh             # Not needed if already running in environment 
-./boom_dse.py generate                 # Generates configurations based on specified constraints. Configurations are saved to boom_configs.json
-./boom_dse.py build <ConfigName>       # Compiles the hardware for a specific config.
-./boom run <ConfigName> <binaryPath>   # Executes benchmarks on the custom processor. Check previous section, part 'Custom software deployment' on how to create suitable binary, or use fft_dummy.riscv  
-```
-
-## 5. Rocket FPGA Automation (`rocket_fpga_dse.py`)
-
-To automate the compilation of heterogeneous Rocket core configurations into FPGA bitstreams (specifically for the VC707), use the `rocket_fpga_dse.py` script.
-
-This script modifies the necessary Scala files with the new `Config` classes (including the FPGA 50MHz, UART, and DDR wrapper settings) and then kicks off the `make bitstream` compiler run.
-
-```bash
-cd /scratch/naouasal
-./rocket_fpga_dse.py generate                   # Generates the config space (combinations of Big/Small Rocket cores) into rocket_configs.json
-./rocket_fpga_dse.py build <DSERocketConfigName>     # Compiles the Vivado bitstream for a generated configuration 
-./rocket_fpga_dse.py build-sim <DSERocketConfigName> # Builds a software Verilator simulator for the base config
-./rocket_fpga_dse.py run-sim <DSERocketConfigName> ./chipyard/tests/build/fft_dummy.riscv # Runs a bare-metal RISC-V application in simulation
-./rocket_fpga_dse.py run-sim <DSERocketConfigName> ./chipyard/software/firemarshal/images/br-base-bin # Boot Linux in Verilator simulation 
-```
-
-### Frequency Configuration
-
-A custom configuration was developed targeting a frequency of 90 MHz. Based on timing analysis and the critical path in the design, the theoretical maximum frequency achievable for this setup on the VC707 FPGA is 91.17 MHz.
-
-To modify the frequency to 90 MHz (or any other target), update the `WithVC707Tweaks` and frequency settings in `chipyard/fpga/src/main/scala/vc707/Configs.scala`. Here is an example of the configuration block:
-
-```scala
-class WithVC707Tweaks extends Config (
-  // clocking
-  new chipyard.harness.WithAllClocksFromHarnessClockInstantiator ++
-  new chipyard.clocking.WithPassthroughClockGenerator ++
-  new chipyard.config.WithMemoryBusFrequency(90.0) ++
-  new chipyard.config.WithSystemBusFrequency(90.0) ++
-  new chipyard.config.WithPeripheryBusFrequency(90.0) ++
-  new chipyard.config.WithControlBusFrequency(90.0) ++
-  new chipyard.config.WithFrontBusFrequency(90.0) ++
-
-  new chipyard.harness.WithHarnessBinderClockFreqMHz(90) ++
-  new WithFPGAFrequency(90) ++ 
-  // harness binders
-  // ... rest of the Tweaks ...
-```
-
-## 6. Bare-Metal Software Deployment
+## Bare-Metal Software Deployment
 
 Standard C libraries (`<stdio.h>`, `<stdlib.h>`) rely on Linux system calls (ECALL), which will crash on a bare-metal FPGA. To execute complex benchmarks like FFT, we use a custom bare-metal environment located in `chipyard/tests/`.
 
@@ -328,6 +230,114 @@ Running complex bare-metal code in Verilator requires two safety traps to preven
 - **The ESTIMATE Trap**: Always use `FFTW_ESTIMATE` when generating plans. Using `FFTW_MEASURE` will cause the 50MHz simulated CPU to spend weeks endlessly looping to benchmark the math path.
 - **The Physics Delay Loop**: Add an empty delay loop (`for (volatile int i = 0; i < 2000000; i++);`) before `return 0;`. This prevents the simulator's `$finish` command from shutting off the virtual silicon before the slow 115,200 baud UART hardware finishes transmitting text.
 
-## 7. Upcoming Workloads: FireMarshal
 
-Future implementations will utilize FireMarshal (`chipyard/software/firemarshal/`) to build custom Buildroot/Linux images, allowing complex OS-dependent benchmarks to run on the generated SoC architecture.
+## FFTW and Edge Detection Metrics
+
+The files for this experiment are in the `tests/` folder of this repository. Copy them into `chipyard/tests/` before running the experiment.
+
+The following files must be in the same `chipyard/tests/` directory:
+
+- `fft_metrics.c`: measures FFTW planning and execution separately.
+- `edgeBare_metrics.c`: measures the Sobel edge-detection loop.
+- `image.py`: converts one image into `image_data.h`.
+- `run_metrics.py`: builds and runs every benchmark in sequence.
+- `plot_metrics.py`: averages the results and creates the plots.
+
+Copy these input folders into `chipyard/tests/` as well:
+
+- `32x32/`
+- `64x64/`
+- `128x128/`
+- `256x256/`
+
+Each folder contains the same four test images at that resolution. The pipeline generates `image_data.h` for one image, compiles both programs with that header, and then moves to the next image.
+
+### Makefile changes
+
+Add both programs to `PROGRAMS` in `chipyard/tests/Makefile`:
+
+```makefile
+PROGRAMS += edgeBare_metrics fft_metrics
+```
+
+Add these build rules:
+
+```makefile
+edgeBare_metrics.riscv: edgeBare_metrics.o $(libgloss)
+	$(GCC) $(LDFLAGS) $< -o $@ -lm
+
+# Rebuild both programs whenever image.py creates a new image_data.h.
+edgeBare_metrics.o fft_metrics.o: image_data.h
+
+fft_metrics.o: fftw3.h
+
+fft_metrics.riscv: fft_metrics.o libfftw3.a $(libgloss)
+	$(GCC) $(LDFLAGS) $< -o $@ \
+		-Wl,--defsym=__heap_size=0x4000000 \
+		-L. -lfftw3 -lm
+```
+
+The normal Chipyard test flags are used:
+
+```makefile
+-O2 -mcmodel=medany -march=rv64imafdc -mabi=lp64d -static
+```
+
+The added linker options are:
+
+- `-lm` for the math library.
+- `-L. -lfftw3` for `libfftw3.a` in `chipyard/tests/`.
+- `-Wl,--defsym=__heap_size=0x4000000` to give FFTW a 64 MiB heap.
+
+Both `fftw3.h` and `libfftw3.a` must also be present in `chipyard/tests/`.
+
+### OwnMemoryRocketConfig
+
+Add this configuration to `chipyard/generators/chipyard/src/main/scala/config/MemorySystemConfigs.scala`:
+
+```scala
+class OwnMemoryRocketConfig extends Config(
+  new freechips.rocketchip.subsystem.WithoutTLMonitors ++
+  new freechips.rocketchip.subsystem.WithExtMemSize((1 << 30) * 1L) ++
+  new freechips.rocketchip.subsystem.WithNBigCores(4) ++
+  new freechips.rocketchip.subsystem.WithNMemoryChannels(4) ++
+  new chipyard.config.AbstractConfig)
+```
+
+This configuration has four Rocket cores, four memory channels, and 1 GiB of external memory. TileLink monitors are disabled to reduce simulation overhead.
+
+### Run the pipeline
+
+The pipeline uses the `OwnMemoryRocketConfig` Verilator simulator. Build it once after adding the configuration:
+
+```bash
+cd chipyard
+source env.sh
+make -C sims/verilator CONFIG=OwnMemoryRocketConfig
+```
+
+Run all 32 benchmarks with:
+
+```bash
+cd chipyard
+source env.sh
+python3 -u tests/run_metrics.py | tee tests/metrics_pipeline.log
+```
+
+The pipeline runs four images at four resolutions with two algorithms:
+
+```text
+4 images x 4 resolutions x 2 algorithms = 32 runs
+```
+
+It saves the raw program output and simulator diagnostics in `tests/metrics_results/`. The C programs record cycles and retired instructions. The Python pipeline converts cycles to target time using the 500 MHz core clock and records the full Verilator host time separately.
+
+Create the averaged CSV file and plots with:
+
+```bash
+cd chipyard
+source env.sh
+python3 tests/plot_metrics.py
+```
+
+The generated files are stored in `tests/metrics_plots/`. This repository also includes the raw results and generated plots from the completed experiment.

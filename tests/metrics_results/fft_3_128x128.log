@@ -1,0 +1,19 @@
+[UART] UART0 is here (stdin/stdout).
+METRIC phase=plan cycles=1594373 instructions=1065840 ipc_milli=668
+METRIC phase=execute cycles=2002119 instructions=1227491 ipc_milli=613
+METRIC algorithm=fftw_r2c_2d
+METRIC dimensions=128x128
+METRIC pixel_sum=1864062
+METRIC dc_real_bits=0x413c717e00000000
+METRIC branch_hits=unavailable
+METRIC branch_misses=unavailable
+CHECK bin_y=0 bin_x=0 real_bits=0x413c717e00000000 imag_bits=0x0
+CHECK bin_y=0 bin_x=1 real_bits=0xc0f200677f8e28b0 imag_bits=0xc0e5cb11ecfb7a5c
+CHECK bin_y=1 bin_x=0 real_bits=0xc10657fe37566fd2 imag_bits=0xc0d157db1b42f835
+CHECK bin_y=64 bin_x=64 real_bits=0xc062800000000000 imag_bits=0x0
+FFT METRICS COMPLETED SUCCESSFULLY
+- /scratch/naouasal/chipyard/sims/verilator/generated-src/chipyard.harness.TestHarness.OwnMemoryRocketConfig/gen-collateral/TestDriver.v:158: Verilog $finish
+
+DERIVED_METRIC phase=plan simulated_seconds=0.003188746 core_hz=500000000
+DERIVED_METRIC phase=execute simulated_seconds=0.004004238 core_hz=500000000
+HOST_METRIC scope=full_verilator_run wall_seconds=603.278
