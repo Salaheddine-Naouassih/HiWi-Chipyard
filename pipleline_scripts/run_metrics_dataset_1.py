@@ -11,7 +11,7 @@ import time
 
 TESTS = Path(__file__).resolve().parent
 HEADER_DIR = Path(
-    "/scratch/naouasal/Dennis/software_profiling/datasets/header/images/dataset_1"
+    "../dataset_1"
 )
 IMAGE_HEADER = TESTS / "image_data.h"
 RESULTS = TESTS / "metrics_results_dataset_1"
